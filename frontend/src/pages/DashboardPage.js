@@ -73,26 +73,6 @@ const DashboardPage = () => {
             d.setDate(d.getDate() + 1);
           }
           setStatistics({ present, absent, late, totalHours });
-            const day = checkIn ? checkIn.getDay() : null;
-            if (day !== null && day !== 0) { // Exclure dimanche
-              if (checkIn) {
-                // Heure d'arrivée
-                const workStart = new Date(checkIn);
-                const [h, m] = WORK_START.split(':');
-                workStart.setHours(Number(h), Number(m), 0, 0);
-                if (checkIn > workStart) {
-                  late++;
-                } else {
-                  present++;
-                }
-                if (checkOut) {
-                  const diffMs = checkOut - checkIn;
-                  totalHours += diffMs / (1000 * 60 * 60);
-                }
-              } else {
-                absent++;
-              }
-            }
           });
           setStatistics({ present, absent, late, totalHours });
         } else {
