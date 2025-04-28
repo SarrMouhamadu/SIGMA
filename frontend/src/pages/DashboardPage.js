@@ -18,64 +18,78 @@ const DashboardPage = () => {
     present: 0,
     absent: 0,
     late: 0,
-    totalHours: 0
+    totalHours: 0,
+    workdays: 0,
+    expectedTotalHours: 0
   });
 
   // Horaires de travail
   const WORK_START = '07:30';
   const WORK_END = '16:00';
 
+  // Calcule la différence en heures entre deux horaires HH:mm
+  function getWorkHoursPerDay(start, end) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    let diff = (eh + em/60) - (sh + sm/60);
+    if (diff < 0) diff += 24;
+    return diff;
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Get user's recent attendance
         const attendanceResult = await getUserAttendance();
         if (attendanceResult.success) {
-          // Filtrer les 30 derniers jours
+          // --- Période du mois courant ---
           const now = new Date();
-          const thirtyDaysAgo = new Date(now);
-          thirtyDaysAgo.setDate(now.getDate() - 29);
-          const attendance30d = attendanceResult.data.attendance.filter(att => {
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          // Filtrer les pointages du mois courant
+          const attendanceMonth = attendanceResult.data.attendance.filter(att => {
             const checkIn = att.checkInTime ? new Date(att.checkInTime) : null;
-            return checkIn && checkIn >= thirtyDaysAgo && checkIn <= now;
+            return checkIn && checkIn >= firstDay && checkIn <= lastDay;
           });
-          setAttendanceData(attendance30d);
+          setAttendanceData(attendanceMonth);
 
-          // Calculer les statistiques sur les 30 derniers jours
-          let present = 0, absent = 0, late = 0, totalHours = 0;
-          // Pour chaque jour ouvré (lundi-samedi)
-          for (let d = new Date(thirtyDaysAgo); d <= now; ) {
-            const dayDate = new Date(d); // clone la date pour la comparaison
-            const day = dayDate.getDay();
-            if (day !== 0) { // Pas dimanche
-              // Chercher un pointage ce jour-là
-              const att = attendance30d.find(a => {
-                const checkIn = a.checkInTime ? new Date(a.checkInTime) : null;
-                return checkIn && checkIn.toDateString() === dayDate.toDateString();
-              });
-              if (att && att.checkInTime) {
-                const checkIn = new Date(att.checkInTime);
-                const checkOut = att.checkOutTime ? new Date(att.checkOutTime) : null;
-                const workStart = new Date(checkIn);
-                const [h, m] = WORK_START.split(':');
-                workStart.setHours(Number(h), Number(m), 0, 0);
-                if (checkIn > workStart) {
-                  late++;
-                } else {
-                  present++;
-                }
-                if (checkOut) {
-                  const diffMs = checkOut - checkIn;
-                  totalHours += diffMs / (1000 * 60 * 60);
-                }
-              } else {
-                absent++;
-              }
-            }
-            d.setDate(d.getDate() + 1);
+          // Calculer les jours ouvrés du mois (lundi-samedi)
+          let workdays = 0;
+          for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+            if (d.getDay() !== 0) workdays++;
           }
-          setStatistics({ present, absent, late, totalHours });
+          const workHoursPerDay = getWorkHoursPerDay(WORK_START, WORK_END);
+          const expectedTotalHours = workdays * workHoursPerDay;
+
+          // Statistiques du mois courant
+          let present = 0, absent = 0, late = 0, totalHours = 0;
+          for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+            if (d.getDay() === 0) continue; // skip dimanche
+            const dayDate = new Date(d);
+            const att = attendanceMonth.find(a => {
+              const checkIn = a.checkInTime ? new Date(a.checkInTime) : null;
+              return checkIn && checkIn.toDateString() === dayDate.toDateString();
+            });
+            if (att && att.checkInTime) {
+              const checkIn = new Date(att.checkInTime);
+              const checkOut = att.checkOutTime ? new Date(att.checkOutTime) : null;
+              const workStart = new Date(checkIn);
+              const [h, m] = WORK_START.split(':');
+              workStart.setHours(Number(h), Number(m), 0, 0);
+              if (checkIn > workStart) {
+                late++;
+              } else {
+                present++;
+              }
+              if (checkOut) {
+                const diffMs = checkOut - checkIn;
+                totalHours += diffMs / (1000 * 60 * 60);
+              }
+            } else {
+              absent++;
+            }
+          }
+          setStatistics({ present, absent, late, totalHours, workdays, expectedTotalHours });
         } else {
           setError('Erreur lors de la récupération des données de pointage');
         }
@@ -85,7 +99,6 @@ const DashboardPage = () => {
         setLoading(false);
       }
     };
-    
     fetchData();
   }, [user]);
 
@@ -121,10 +134,20 @@ const DashboardPage = () => {
     );
   }
 
+  // Infos du mois courant
+  const now = new Date();
+  const currentMonthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+  const workdays = statistics.workdays || 0;
+  const expectedTotalHours = statistics.expectedTotalHours || 0;
+  const proportion = expectedTotalHours > 0 ? (statistics.totalHours / expectedTotalHours) * 100 : 0;
+
   return (
     <div className="py-4">
-      <h1 className="mb-4">Tableau de bord</h1>
-      
+      <h1 className="mb-2">Tableau de bord</h1>
+      <h5 className="mb-4">Mois courant : <b style={{ textTransform: 'capitalize' }}>{currentMonthName}</b></h5>
+      <div className="mb-3 text-muted" style={{ fontSize: 15 }}>
+        Jours ouvrés : <b>{workdays}</b> &nbsp;|&nbsp; Heures attendues : <b>{expectedTotalHours.toFixed(1)}h</b> &nbsp;|&nbsp; Heures pointées : <b>{statistics.totalHours.toFixed(1)}h</b> &nbsp;|&nbsp; Taux de pointage : <b>{proportion.toFixed(1)}%</b>
+      </div>
       {error && <Alert variant="danger">{error}</Alert>}
       
       <Row className="mb-4">
