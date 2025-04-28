@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Button, Table, Spinner, Alert } from 'react-bootstrap';
+import { Doughnut } from 'react-chartjs-2';
+import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
+Chart.register(ArcElement, Tooltip, Legend);
 import { FaUserCheck, FaUserClock, FaClock, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { getUserAttendance } from '../services/attendanceService';
@@ -176,6 +179,41 @@ const DashboardPage = () => {
         </Col>
       </Row>
       
+      {/* Graphe en cercle de la répartition */}
+      <Row className="mb-4">
+        <Col md={6} className="mx-auto">
+          <Card>
+            <Card.Body>
+              <h5 className="mb-3 text-center">Répartition des 30 derniers jours</h5>
+              <Doughnut
+                data={{
+                  labels: ['Présent', 'Retard', 'Absent'],
+                  datasets: [
+                    {
+                      data: [statistics.present, statistics.late, statistics.absent],
+                      backgroundColor: ['#2ecc71', '#f39c12', '#e74c3c'],
+                      borderWidth: 2
+                    }
+                  ]
+                }}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    legend: {
+                      display: true,
+                      position: 'bottom',
+                      labels: {
+                        font: { size: 16 }
+                      }
+                    }
+                  }
+                }}
+              />
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
       <Row>
         <Col md={12}>
           <Card>
