@@ -1,4 +1,6 @@
 import React from 'react';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import theme from './theme';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Container } from 'react-bootstrap';
 import Header from './components/Header';
@@ -13,7 +15,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-const App = () => {
+function AppContent() {
   return (
     <AuthProvider>
       <Router>
