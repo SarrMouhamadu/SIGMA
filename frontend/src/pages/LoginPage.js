@@ -90,10 +90,6 @@ const LoginPage = () => {
         </CardContent>
       </Card>
     </Box>
-          Vous n'avez pas de compte ? <Link to="/register">S'inscrire</Link>
-        </div>
-      </Col>
-    </Row>
   );
 };
 
