@@ -202,9 +202,9 @@ const DashboardPage = () => {
                            const [h, m] = WORK_START.split(':');
                            workStart.setHours(Number(h), Number(m), 0, 0);
                            if (checkIn > workStart) {
-                             return 'En retard';
+                             return 'late';
                            } else {
-                             return 'Présent';
+                             return 'present';
                            }
                          } else {
                            return 'Absent';
