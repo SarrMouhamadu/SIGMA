@@ -73,7 +73,6 @@ const DashboardPage = () => {
             d.setDate(d.getDate() + 1);
           }
           setStatistics({ present, absent, late, totalHours });
-          });
         } else {
           setError('Erreur lors de la récupération des données de pointage');
         }
