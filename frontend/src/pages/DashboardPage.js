@@ -185,14 +185,15 @@ const DashboardPage = () => {
           <Card>
             <Card.Body>
               <h5 className="mb-3 text-center">Répartition des 30 derniers jours</h5>
-              <Doughnut
-                data={{
-                  labels: ['Présent', 'Retard', 'Absent'],
-                  datasets: [
-                    {
-                      data: [statistics.present, statistics.late, statistics.absent],
-                      backgroundColor: ['#2ecc71', '#f39c12', '#e74c3c'],
-                      borderWidth: 2
+              <div style={{ maxWidth: 250, margin: '0 auto' }}>
+                <Doughnut
+                  data={{
+                    labels: ['Présent', 'Retard', 'Absent'],
+                    datasets: [
+                      {
+                        data: [statistics.present, statistics.late, statistics.absent],
+                        backgroundColor: ['#2ecc71', '#f39c12', '#e74c3c'],
+                        borderWidth: 2
                     }
                   ]
                 }}
@@ -209,6 +210,7 @@ const DashboardPage = () => {
                   }
                 }}
               />
+              </div>
             </Card.Body>
           </Card>
         </Col>
