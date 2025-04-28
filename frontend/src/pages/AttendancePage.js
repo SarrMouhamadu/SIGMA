@@ -3,6 +3,8 @@ import { Row, Col, Card, Button, Table, Form, Alert, Spinner } from 'react-boots
 import { FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { checkIn, checkOut, getUserAttendance } from '../services/attendanceService';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const AttendancePage = () => {
   const { user } = useAuth();
@@ -291,7 +293,7 @@ const AttendancePage = () => {
                   </thead>
                   <tbody>
                     {attendanceData.map((attendance) => (
-                      <tr key={attendance._id}>
+                      <tr key={attendance.id || attendance._id}>
                         <td>{new Date(attendance.checkInTime).toLocaleDateString('fr-FR')}</td>
                         <td>{formatDate(attendance.checkInTime)}</td>
                         <td>{attendance.checkOutTime ? formatDate(attendance.checkOutTime) : 'En cours'}</td>

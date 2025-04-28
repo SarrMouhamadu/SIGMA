@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Button, Table, Spinner, Alert } from 'react-bootstrap';
 import { FaUserCheck, FaUserClock, FaClock, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-import { getUserAttendance, getStatistics } from '../services/attendanceService';
+import { getUserAttendance } from '../services/attendanceService';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -16,42 +18,85 @@ const DashboardPage = () => {
     totalHours: 0
   });
 
+  // Horaires de travail
+  const WORK_START = '07:30';
+  const WORK_END = '16:00';
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
         // Get user's recent attendance
         const attendanceResult = await getUserAttendance();
-        
         if (attendanceResult.success) {
-          setAttendanceData(attendanceResult.data.attendance.slice(0, 5));
+          // Filtrer les 30 derniers jours
+          const now = new Date();
+          const thirtyDaysAgo = new Date(now);
+          thirtyDaysAgo.setDate(now.getDate() - 29);
+          const attendance30d = attendanceResult.data.attendance.filter(att => {
+            const checkIn = att.checkInTime ? new Date(att.checkInTime) : null;
+            return checkIn && checkIn >= thirtyDaysAgo && checkIn <= now;
+          });
+          setAttendanceData(attendance30d);
+
+          // Calculer les statistiques sur les 30 derniers jours
+          let present = 0, absent = 0, late = 0, totalHours = 0;
+          // Pour chaque jour ouvré (lundi-samedi)
+          for (let d = new Date(thirtyDaysAgo); d <= now; ) {
+            const dayDate = new Date(d); // clone la date pour la comparaison
+            const day = dayDate.getDay();
+            if (day !== 0) { // Pas dimanche
+              // Chercher un pointage ce jour-là
+              const att = attendance30d.find(a => {
+                const checkIn = a.checkInTime ? new Date(a.checkInTime) : null;
+                return checkIn && checkIn.toDateString() === dayDate.toDateString();
+              });
+              if (att && att.checkInTime) {
+                const checkIn = new Date(att.checkInTime);
+                const checkOut = att.checkOutTime ? new Date(att.checkOutTime) : null;
+                const workStart = new Date(checkIn);
+                const [h, m] = WORK_START.split(':');
+                workStart.setHours(Number(h), Number(m), 0, 0);
+                if (checkIn > workStart) {
+                  late++;
+                } else {
+                  present++;
+                }
+                if (checkOut) {
+                  const diffMs = checkOut - checkIn;
+                  totalHours += diffMs / (1000 * 60 * 60);
+                }
+              } else {
+                absent++;
+              }
+            }
+            d.setDate(d.getDate() + 1);
+          }
+          setStatistics({ present, absent, late, totalHours });
+            const day = checkIn ? checkIn.getDay() : null;
+            if (day !== null && day !== 0) { // Exclure dimanche
+              if (checkIn) {
+                // Heure d'arrivée
+                const workStart = new Date(checkIn);
+                const [h, m] = WORK_START.split(':');
+                workStart.setHours(Number(h), Number(m), 0, 0);
+                if (checkIn > workStart) {
+                  late++;
+                } else {
+                  present++;
+                }
+                if (checkOut) {
+                  const diffMs = checkOut - checkIn;
+                  totalHours += diffMs / (1000 * 60 * 60);
+                }
+              } else {
+                absent++;
+              }
+            }
+          });
+          setStatistics({ present, absent, late, totalHours });
         } else {
           setError('Erreur lors de la récupération des données de pointage');
-        }
-        
-        // Get statistics if user is admin or manager
-        if (user.role === 'admin' || user.role === 'manager') {
-          const statsResult = await getStatistics();
-          
-          if (statsResult.success) {
-            // Process statistics data
-            const stats = {
-              present: 0,
-              absent: 0,
-              late: 0,
-              totalHours: 0
-            };
-            
-            statsResult.data.statistics.forEach(userStat => {
-              stats.present += userStat.present;
-              stats.absent += userStat.absent;
-              stats.late += userStat.late;
-              stats.totalHours += userStat.totalHours;
-            });
-            
-            setStatistics(stats);
-          }
         }
       } catch (err) {
         setError('Une erreur est survenue lors du chargement des données');
@@ -156,15 +201,53 @@ const DashboardPage = () => {
       <Row>
         <Col md={12}>
           <Card>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Pointages récents</h5>
-              <Button variant="outline-primary" size="sm" href="/attendance">
-                Voir tout
-              </Button>
-            </Card.Header>
-            <Card.Body>
-              {attendanceData.length > 0 ? (
-                <Table responsive hover>
+             <Card.Header className="d-flex justify-content-between align-items-center">
+               <h5 className="mb-0">Pointages récents</h5>
+               <div>
+                 <Button 
+                   variant="outline-success" 
+                   size="sm"
+                   className="me-2"
+                   onClick={() => {
+                     // Exporter les 30 derniers jours
+                     const exportData = attendanceData.map(attendance => ({
+                       'Date': new Date(attendance.checkInTime).toLocaleDateString('fr-FR'),
+                       'Entrée': attendance.checkInTime ? formatDate(attendance.checkInTime) : '',
+                       'Sortie': attendance.checkOutTime ? formatDate(attendance.checkOutTime) : '',
+                       'Durée': calculateDuration(attendance.checkInTime, attendance.checkOutTime),
+                       'Statut': (() => {
+                         const checkIn = attendance.checkInTime ? new Date(attendance.checkInTime) : null;
+                         if (checkIn) {
+                           const workStart = new Date(checkIn);
+                           const [h, m] = WORK_START.split(':');
+                           workStart.setHours(Number(h), Number(m), 0, 0);
+                           if (checkIn > workStart) {
+                             return 'En retard';
+                           } else {
+                             return 'Présent';
+                           }
+                         } else {
+                           return 'Absent';
+                         }
+                       })()
+                     }));
+                     const ws = XLSX.utils.json_to_sheet(exportData);
+                     const wb = XLSX.utils.book_new();
+                     XLSX.utils.book_append_sheet(wb, ws, 'Pointages 30j');
+                     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                     saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'pointages_30_derniers_jours.xlsx');
+                   }}
+                 >
+                   Exporter Excel (30j)
+                 </Button>
+                 <Button variant="outline-primary" size="sm" href="/attendance">
+                   Voir tout
+                 </Button>
+               </div>
+             </Card.Header>
+             <Card.Body>
+               {attendanceData.length > 0 ? (
+                 <Table responsive hover>
                   <thead>
                     <tr>
                       <th>Date</th>
@@ -176,7 +259,7 @@ const DashboardPage = () => {
                   </thead>
                   <tbody>
                     {attendanceData.map((attendance) => (
-                      <tr key={attendance._id}>
+                      <tr key={attendance.id || attendance._id}>
                         <td>{new Date(attendance.checkInTime).toLocaleDateString('fr-FR')}</td>
                         <td>{formatDate(attendance.checkInTime)}</td>
                         <td>{attendance.checkOutTime ? formatDate(attendance.checkOutTime) : 'En cours'}</td>
